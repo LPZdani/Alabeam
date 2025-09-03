@@ -1,0 +1,5 @@
+Model_Type,R²,MAE,Architecture,Model_File
+LightGBM_Displacement,0.857,11.022,Gradient_Boosting,model_max_displacement_logHGB.joblib
+LightGBM_Stress,0.961,36.882,Gradient_Boosting,model_max_stress_logHGB.joblib
+NeuralNet_Displacement_Best,0.8191883955335824,12.106153712517935,Medium_Complexity,model_max_displacement_neuralnet.keras
+NeuralNet_Stress_Best,0.9263674393234727,58.47241675673505,Simple_Architecture,model_max_stress_neuralnet.keras
