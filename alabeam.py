@@ -58,7 +58,6 @@ st.markdown(
     .stSlider .css-1c5h5b6,
     .stSlider .st-c2,
     .stSlider .css-1dp5vir {
-        background: #214E7A !important;
         color: #214E7A !important;
         border-color: #214E7A !important;
     }
@@ -118,10 +117,11 @@ with cols[0]:
         st.image(logo_path, width=500)
 with cols[1]:
     st.title("Predicción de vigas | Alabeam")
-
-st.markdown(
-    "Esta app genera predicciones de **desplazamiento máximo** y **tensión máxima** utilizando modelos entrenados."
-)
+    st.markdown(
+        "**¡Bienvenid@ soy Alabeam!** el genio del cálculo estructural, deja que te ayude a diseñar vigas de manera rápida y eficiente.<br>"
+        "Obten predicciones de **desplazamiento máximo** y **tensión máxima** a partir de las características de tu viga.",
+        unsafe_allow_html=True
+    )
 
 # ----------------------------
 # Datos maestros
@@ -134,6 +134,17 @@ MATERIALS = [
 ]
 MAT_INDEX = {m["name"]: m for m in MATERIALS}
 
+# Spanish material names for UI display
+MATERIALS_SPANISH = {
+    "Acero": "Steel",
+    "Acero Inoxidable": "Inox Steel", 
+    "Aluminio": "Aluminum",
+    "Titanio": "Titanium"
+}
+
+# Reverse mapping for recommendations (English to Spanish)
+MATERIALS_SPANISH_REVERSE = {v: k for k, v in MATERIALS_SPANISH.items()}
+
 # Mapeos UI → valores que espera tu código
 SECTION_LABELS = {
     "Barra rectangular (BAR)": "BAR",
@@ -143,9 +154,9 @@ SECTION_LABELS = {
     "Perfil en I (I)": "I",
 }
 SUPPORT_LABELS = {
-    "Empotrado (clamped)": "clamped",
-    "Simple (simple)": "simple",
-    "Libre (free)": None,  # se guarda como NaN/None
+    "Empotrado": "clamped",
+    "Simple": "simple",
+    "Libre": None,  # se guarda como NaN/None
 }
 LOAD_TYPES = {"Fuerza": "force", "Momento": "moment"}
 LOAD_DIRS_FORCE = {"X": "X", "Y": "Y"}
@@ -993,6 +1004,18 @@ with st.sidebar:
         horizontal=True
     )
 
+    # Safety factor configuration
+    st.subheader("🛡️ Factor de Seguridad")
+    safety_factor_percent = st.slider(
+        "Factor de seguridad (%)",
+        min_value=0,
+        max_value=50,
+        value=10,
+        step=1,
+        help="Porcentaje adicional aplicado a las predicciones para mayor seguridad. 10% significa que los resultados se incrementan en un 10%."
+    )
+    safety_factor = 1 + (safety_factor_percent / 100)
+
     default_dir = "models" if model_choice == "LGBM" else "models_neural"
     models_dir = st.text_input("Carpeta de modelos", value=default_dir,
                                help="Ruta relativa o absoluta. Ver archivos esperados más abajo.")
@@ -1041,7 +1064,11 @@ with colA:
 
 with colB:
     st.subheader("Material")
-    mat_name = st.selectbox("Material", [m["name"] for m in MATERIALS], index=0)
+
+    # Display materials in Spanish but store English names
+    mat_spanish = st.selectbox("Material", list(MATERIALS_SPANISH.keys()), index=0)
+    mat_name = MATERIALS_SPANISH[mat_spanish]  # Convert to English for model
+
     m = MAT_INDEX[mat_name]
     st.write(
         f"E = **{m['E']:.0f}** MPa  |  ν = **{m['nu']}**  |  ρ = **{m['density']:.2e}** kg/mm³  "
@@ -1202,7 +1229,7 @@ with col_summary:
     
     **Apoyos:**
     • Izq: {sL_ui.split('(')[0].strip()}
-    • Der: {sR_ui.split('(')[0].strip()}
+    • Dcha: {sR_ui.split('(')[0].strip()}
     """)
     
     # Detalles de cargas
@@ -1217,11 +1244,6 @@ with col_summary:
     # Indicadores de estado
     total_forces = sum(abs(c["mag"]) for c in cargas if c["type"] == "force")
     total_moments = sum(abs(c["mag"]) for c in cargas if c["type"] == "moment")
-    
-    if total_forces > 0:
-        st.metric("Suma de fuerzas", f"{total_forces:.0f} N", help="Suma del valor absoluto de todas las fuerzas")
-    if total_moments > 0:
-        st.metric("Suma de momentos", f"{total_moments:.0f} N·mm", help="Suma del valor absoluto de todos los momentos")
 
 st.divider()
 
@@ -1271,7 +1293,7 @@ def run_preprocess_on_df(df_raw: pd.DataFrame) -> pd.DataFrame:
 # ----------------------------
 # Predicción LGBM
 # ----------------------------
-def predict_lgbm(df_feat: pd.DataFrame, models_path: Path):
+def predict_lgbm(df_feat: pd.DataFrame, models_path: Path, safety_factor: float = 1.1):
     disp_path = models_path / "model_max_displacement_logHGB.joblib"
     stress_path = models_path / "model_max_stress_logHGB.joblib"
     if not disp_path.exists() or not stress_path.exists():
@@ -1288,7 +1310,12 @@ def predict_lgbm(df_feat: pd.DataFrame, models_path: Path):
 
     y_disp = bundle_disp["hgb"].predict(Xd)
     y_stress = bundle_strs["hgb"].predict(Xs)
-    return float(y_disp[0]), float(y_stress[0])
+    
+    # Apply safety factor for conservative predictions
+    y_disp_safe = y_disp[0] * safety_factor
+    y_stress_safe = y_stress[0] * safety_factor
+    
+    return float(y_disp_safe), float(y_stress_safe)
 
 # ----------------------------
 # Predicción Red Neuronal
@@ -1308,7 +1335,7 @@ def predict_lgbm(df_feat: pd.DataFrame, models_path: Path):
 #     # Caso B: los nombres son los headers
 #     return list(df.columns)
 
-def predict_neural(df_feat: pd.DataFrame, models_path: Path):
+def predict_neural(df_feat: pd.DataFrame, models_path: Path, safety_factor: float = 1.1):
     """
     Carga modelos + scalers de NN, asegura:
       - Orden EXACTO de columnas
@@ -1407,21 +1434,181 @@ def predict_neural(df_feat: pd.DataFrame, models_path: Path):
     yd = float(np.ravel(yd)[0])
     ys = float(np.ravel(ys)[0])
 
-    return yd, ys
+    # Apply safety factor for conservative predictions
+    yd_safe = yd * safety_factor
+    ys_safe = ys * safety_factor
+
+    return yd_safe, ys_safe
 
 
 # ----------------------------
-# Guía de secciones (ayuda)
+# Engineering Recommendations
 # ----------------------------
-with st.expander("📐 Guía rápida de dimensiones por tipo de sección"):
-    st.markdown(
-        "- **ROD**: `dim1 = radio`  \n"
-        "- **TUBE**: `dim1 = radio externo`, `dim2 = radio interno`  \n"
-        "- **BAR**: `dim1 = ancho b`, `dim2 = alto h`  \n"
-        "- **BOX**: `dim1 = ancho b`, `dim2 = alto h`, `dim3 = espesor en ancho t_x`, `dim4 = espesor en alto t_y`  \n"
-        "- **I**: `dim1 = h`, `dim2 = b_ala inferior`, `dim3 = b_ala superior`, "
-        "`dim4 = t_alma`, `dim5 = t_ala inferior`, `dim6 = t_ala superior`"
-    )
+def generate_engineering_recommendations(stress_mpa: float, displacement_mm: float, 
+                                        current_material: str, current_area: float = None) -> list:
+    """
+    Generate engineering recommendations based on stress, displacement, and current design.
+    
+    Returns a list of recommendation dictionaries with 'type', 'message', and 'icon' keys.
+    """
+    recommendations = []
+    current_mat = MAT_INDEX[current_material]
+    yield_strength = current_mat["yield_strength"]
+    
+    # Convert English material name to Spanish for display
+    current_material_spanish = MATERIALS_SPANISH_REVERSE.get(current_material, current_material)
+    
+    # Safety factors for recommendations
+    stress_safety_factor = 2.0  # Conservative safety factor for stress
+    safe_stress_limit = yield_strength / stress_safety_factor
+    
+    # Stress-based recommendations
+    stress_ratio = stress_mpa / yield_strength
+    
+    if stress_ratio < 0.3:  # Very low stress utilization
+        current_material_spanish = MATERIALS_SPANISH_REVERSE.get(current_material, current_material)
+        recommendations.append({
+            'type': 'material_downgrade',
+            'icon': '💰',
+            'message': f"**Optimización de material:** El estrés actual ({stress_mpa:.1f} MPa) es muy bajo comparado con la resistencia del {current_material_spanish} ({yield_strength:.0f} MPa). Considera usar un material más económico:"
+        })
+        
+        # Suggest cheaper alternatives
+        if current_material == "Titanium":
+            recommendations.append({
+                'type': 'suggestion',
+                'icon': '➡️',
+                'message': "• **Cambiar a Acero** (370 MPa) - Mucho más económico y suficiente para esta aplicación"
+            })
+            recommendations.append({
+                'type': 'suggestion',
+                'icon': '➡️',
+                'message': "• **Cambiar a Aluminio** (270 MPa) - Más ligero y económico que el titanio"
+            })
+        elif current_material == "Steel":
+            recommendations.append({
+                'type': 'suggestion',
+                'icon': '➡️',
+                'message': "• **Cambiar a Aluminio** (270 MPa) - Más ligero y suficiente para esta carga"
+            })
+
+    elif stress_ratio >= 1.0:  # Exceeds yield strength - critical
+        recommendations.append({
+            'type': 'critical',
+            'icon': '❌',
+            'message': f"**¡Peligro!** El estrés ({stress_mpa:.1f} MPa) excede el límite del {current_material_spanish} ({yield_strength:.0f} MPa). Factor de utilización: {stress_ratio:.1%}. Se requiere acción inmediata:"
+        })
+
+        # Suggest stronger materials or larger sections
+        if current_material in ["Aluminum", "Inox Steel"]:
+            recommendations.append({
+                'type': 'material_upgrade',
+                'icon': '🔧',
+                'message': "• **Cambiar a Acero** (370 MPa) - Mayor resistencia"
+            })
+            recommendations.append({
+                'type': 'material_upgrade',
+                'icon': '🔧',
+                'message': "• **Cambiar a Titanio** (830 MPa) - Máxima resistencia (alta resistencia/peso)"
+            })
+        elif current_material == "Steel":
+            recommendations.append({
+                'type': 'material_upgrade',
+                'icon': '🔧',
+                'message': "• **Cambiar a Titanio** (830 MPa) - Resistencia superior"
+            })
+        recommendations.append({
+            'type': 'section_upgrade',
+            'icon': '📐',
+            'message': "• **Aumentar área de sección** - Incrementar dimensiones para reducir el estrés"
+        })
+
+    elif stress_ratio > 0.9 and stress_ratio < 1.0:  # High stress utilization - concerning
+        recommendations.append({
+            'type': 'warning',
+            'icon': '⚠️',
+            'message': f"**¡Atención!** El estrés ({stress_mpa:.1f} MPa) está cerca del límite del {current_material_spanish} ({yield_strength:.0f} MPa). Factor de utilización: {stress_ratio:.1%}"
+        })
+        
+        # Suggest stronger materials or larger sections
+        if current_material in ["Aluminum", "Inox Steel"]:
+            recommendations.append({
+                'type': 'material_upgrade',
+                'icon': '🔧',
+                'message': "• **Cambiar a Acero** (370 MPa) - Mayor resistencia"
+            })
+            recommendations.append({
+                'type': 'material_upgrade',
+                'icon': '🔧',
+                'message': "• **Cambiar a Titanio** (830 MPa) - Máxima resistencia (alta resistencia/peso)"
+            })
+        elif current_material == "Steel":
+            recommendations.append({
+                'type': 'material_upgrade',
+                'icon': '🔧',
+                'message': "• **Cambiar a Titanio** (830 MPa) - Resistencia superior"
+            })
+        
+        recommendations.append({
+            'type': 'section_upgrade',
+            'icon': '📐',
+            'message': "• **Aumentar área de sección** - Incrementar dimensiones para reducir el estrés"
+        })
+    
+    elif stress_ratio > 0.5:  # Moderate stress utilization
+        recommendations.append({
+            'type': 'info',
+            'icon': '📊',
+            'message': f"**Factor de utilización moderado:** {stress_ratio:.1%} del límite elástico. Diseño aceptable con margen de seguridad razonable."
+        })
+    
+    # Displacement-based recommendations
+    if displacement_mm > 10.0:  # Large displacement
+        recommendations.append({
+            'type': 'warning',
+            'icon': '📏',
+            'message': f"**Desplazamiento elevado:** {displacement_mm:.2f} mm. Considera:"
+        })
+        recommendations.append({
+            'type': 'suggestion',
+            'icon': '🔧',
+            'message': "• **Aumentar rigidez** - Incrementar momento de inercia (altura de la sección)"
+        })
+        recommendations.append({
+            'type': 'suggestion',
+            'icon': '🔧',
+            'message': "• **Material más rígido** - Mayor módulo elástico (E)"
+        })
+        recommendations.append({
+            'type': 'suggestion',
+            'icon': '🔧',
+            'message': "• **Reducir luz libre** - Añadir apoyos intermedios si es posible"
+        })
+    
+    elif displacement_mm < 1.0:  # Very small displacement
+        recommendations.append({
+            'type': 'info',
+            'icon': '✅',
+            'message': f"**Desplazamiento aceptable:** {displacement_mm:.3f} mm. La rigidez del diseño es adecuada."
+        })
+    
+    # Combined recommendations
+    if stress_ratio > 0.9 and displacement_mm > 5.0:
+        recommendations.append({
+            'type': 'critical',
+            'icon': '🚨',
+            'message': "**Revisión crítica necesaria:** Tanto el estrés como el desplazamiento son elevados. Se recomienda rediseño completo."
+        })
+    
+    # Efficiency recommendations
+    if stress_ratio < 0.2 and displacement_mm < 2.0:
+        recommendations.append({
+            'type': 'optimization',
+            'icon': '♻️',
+            'message': "**Oportunidad de optimización:** El diseño actual es muy conservador. Puedes reducir dimensiones o usar materiales más económicos."
+        })
+    
+    return recommendations
 
 # ----------------------------
 # Acción: Predecir
@@ -1439,24 +1626,120 @@ if btn:
             raise FileNotFoundError(f"La carpeta de modelos no existe: {models_path}")
 
         if model_choice == "LGBM":
-            y_disp, y_stress = predict_lgbm(df_feat, models_path)
+            y_disp, y_stress = predict_lgbm(df_feat, models_path, safety_factor)
         else:
-            y_disp, y_stress = predict_neural(df_feat, models_path)
+            y_disp, y_stress = predict_neural(df_feat, models_path, safety_factor)
 
         st.success("Predicción completada.")
+        if safety_factor_percent > 0:
+            st.info(f"🛡️ **Nota:** Se ha aplicado un factor de seguridad del {safety_factor_percent}% a los resultados predichos.")
         colr1, colr2 = st.columns(2)
         with colr1:
-            st.metric("Desplazamiento máximo [mm]", f"{y_disp:,.6f}")
+            help_text = f"Incluye factor de seguridad del {safety_factor_percent}%" if safety_factor_percent > 0 else "Sin factor de seguridad aplicado"
+            st.metric("Desplazamiento máximo [mm]", f"{y_disp:,.6f}", help=help_text)
         with colr2:
-            st.metric("Tensión máxima [MPa]", f"{y_stress:,.3f}")
+            help_text = f"Incluye factor de seguridad del {safety_factor_percent}%" if safety_factor_percent > 0 else "Sin factor de seguridad aplicado"
+            st.metric("Tensión máxima [MPa]", f"{y_stress:,.3f}", help=help_text)
+
+        # Generate and display engineering recommendations
+        st.divider()
+        st.subheader("🎯 Recomendaciones")
+        
+        # Get current area for context (if available)
+        current_area = None
+        try:
+            if any([dim1, dim2, dim3, dim4, dim5, dim6]):
+                current_area, _ = calculate_section_properties(section_type, dim1, dim2, dim3, dim4, dim5, dim6)
+        except:
+            pass
+        
+        recommendations = generate_engineering_recommendations(
+            stress_mpa=y_stress, 
+            displacement_mm=y_disp, 
+            current_material=mat_name,
+            current_area=current_area
+        )
+        
+        if recommendations:
+            for rec in recommendations:
+                if rec['type'] == 'critical':
+                    st.error(f"{rec['icon']} {rec['message']}")
+                elif rec['type'] == 'warning':
+                    st.warning(f"{rec['icon']} {rec['message']}")
+                elif rec['type'] in ['material_downgrade', 'optimization']:
+                    st.info(f"{rec['icon']} {rec['message']}")
+                elif rec['type'] == 'info':
+                    st.success(f"{rec['icon']} {rec['message']}")
+                else:
+                    st.write(f"{rec['icon']} {rec['message']}")
+        else:
+            st.success("✅ El diseño actual parece adecuado para las cargas aplicadas.")
+        
+        # Material utilization chart
+        current_mat = MAT_INDEX[mat_name]
+        stress_ratio = y_stress / current_mat["yield_strength"]
+        
+        if stress_ratio > 0.1:  # Only show if there's meaningful stress
+            with st.expander("📊 Análisis de Utilización del Material"):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    # Create utilization bar chart
+                    fig = go.Figure()
+                    
+                    # Add stress utilization bar
+                    fig.add_trace(go.Bar(
+                        x=[stress_ratio * 100],
+                        y=['Utilización'],
+                        orientation='h',
+                        marker_color='red' if stress_ratio > 0.7 else 'orange' if stress_ratio > 0.5 else 'green',
+                        text=[f'{stress_ratio:.1%}'],
+                        textposition='inside',
+                        name='Estrés actual'
+                    ))
+                    
+                    # Add safe limit line
+                    fig.add_vline(x=50, line_dash="dash", line_color="orange", 
+                                 annotation_text="Límite recomendado (50%)")
+                    
+                    # Add yield strength line
+                    fig.add_vline(x=100, line_dash="dash", line_color="red", 
+                                 annotation_text="Límite elástico (100%)")
+                    
+                    fig.update_layout(
+                        title=f"Utilización del {MATERIALS_SPANISH_REVERSE.get(mat_name, mat_name)} (fy = {current_mat['yield_strength']:.0f} MPa)",
+                        xaxis_title="Porcentaje de utilización (%)",
+                        xaxis=dict(range=[0, min(120, max(100, stress_ratio * 120))]),
+                        height=200,
+                        showlegend=False
+                    )
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    st.metric("Factor de utilización", f"{stress_ratio:.1%}")
+                    st.metric("Margen de seguridad", f"{(1-stress_ratio):.1%}")
+                    if stress_ratio < 1.0:
+                        additional_load = (1.0 - stress_ratio) * 100
+                        st.metric("Capacidad adicional", f"{additional_load:.0f}%")
 
         # Descarga CSV
         out = df_raw.copy()
-        out["max_displacement_pred"] = y_disp
-        out["max_stress_pred"] = y_stress
+        if safety_factor_percent > 0:
+            out["max_displacement_pred_with_safety"] = y_disp
+            out["max_stress_pred_with_safety"] = y_stress
+            download_text = f"💾 Descargar CSV con entradas + predicciones (con factor de seguridad {safety_factor_percent}%)"
+            filename = f"prediccion_viga_seguridad_{safety_factor_percent}pct.csv"
+        else:
+            out["max_displacement_pred"] = y_disp
+            out["max_stress_pred"] = y_stress
+            download_text = "💾 Descargar CSV con entradas + predicciones"
+            filename = "prediccion_viga.csv"
+        
         csv_bytes = out.to_csv(index=False).encode("utf-8")
-        st.download_button("💾 Descargar CSV con entradas + predicciones", data=csv_bytes,
-                           file_name="prediccion_viga.csv", mime="text/csv")
+        st.download_button(download_text, 
+                           data=csv_bytes,
+                           file_name=filename, mime="text/csv")
 
         with st.expander("🔎 Debug: ver fila cruda y features preprocesadas"):
             st.markdown("**Entrada cruda (1 fila):**")
@@ -1471,7 +1754,5 @@ if btn:
 # Notas finales
 # ----------------------------
 st.caption(
-    "Notas: usa **mm**, **N** y **MPa** (momento en **N·mm**). Para un extremo **libre**, "
-    "selecciona *Libre (free)*: internamente se codifica como NaN para que el factor **K** se "
-    "calcule como voladizo en tu `config.py`/`preprocessing.py`."
+    "Creado por Daniel López López - https://www.linkedin.com/in/daniel-lopez-lopez1313/"
 )
