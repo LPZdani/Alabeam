@@ -199,8 +199,8 @@ def calculate_section_properties(section_type, dim1, dim2, dim3, dim4, dim5, dim
         # Sección rectangular hueca
         b = dim1   # ancho total
         h = dim2   # alto total
-        tx = dim3  # espesor en X
-        ty = dim4  # espesor en Y
+        ty = dim3  # espesor en Y
+        tx = dim4  # espesor en X
         bi = max(b - 2.0*tx, 0.0)  # ancho interno
         hi = max(h - 2.0*ty, 0.0)  # alto interno
         A = b*h - bi*hi
@@ -431,7 +431,7 @@ def draw_cross_section(section_type, dim1, dim2, dim3, dim4, dim5, dim6):
                 fill='toself',
                 fillcolor='rgba(70, 130, 180, 0.4)',
                 line=dict(color='navy', width=3),
-                name='Material de la caja',
+                name='Sección rectangular hueca',
                 showlegend=False
             ))
             

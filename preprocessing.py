@@ -38,8 +38,8 @@ def main_preprocess(IN_CSV, OUT_CSV):
     # --- BOX (rectangular hueca) ---
     b = df.loc[m_BOX, "dim1"].values
     h = df.loc[m_BOX, "dim2"].values
-    tx = df.loc[m_BOX, "dim3"].values
-    ty = df.loc[m_BOX, "dim4"].values
+    ty = df.loc[m_BOX, "dim3"].values
+    tx = df.loc[m_BOX, "dim4"].values
     bi = np.maximum(b - 2.0*tx, 0.0)
     hi = np.maximum(h - 2.0*ty, 0.0)
     A  = b*h - bi*hi
