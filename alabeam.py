@@ -378,32 +378,23 @@ def draw_cross_section(section_type, dim1, dim2, dim3, dim4, dim5, dim6):
         margin = max(dim1, dim2) * 0.15
         
         # Dimensión horizontal (ancho)
-        fig.add_shape(
-            type="line",
-            x0=-dim1/2, y0=-dim2/2-margin,
-            x1=dim1/2, y1=-dim2/2-margin,
-            line=dict(color="red", width=3)
-        )
+
         fig.add_annotation(
-            x=0, y=-dim2/2-margin*1.3,
+            x=0, y=-dim2/2-margin*1.05,
             text=f"b = {dim1:.1f} mm",
             bgcolor="white", bordercolor="red", borderwidth=2,
-            font=dict(size=14, color="red")
+            font=dict(size=14, color="red"),
+            showarrow=False
         )
         
         # Dimensión vertical (altura)
-        fig.add_shape(
-            type="line",
-            x0=-dim1/2-margin, y0=-dim2/2,
-            x1=-dim1/2-margin, y1=dim2/2,
-            line=dict(color="green", width=3)
-        )
         fig.add_annotation(
             x=-dim1/2-margin*1.3, y=0,
             text=f"h = {dim2:.1f} mm",
             bgcolor="white", bordercolor="green", borderwidth=2,
             font=dict(size=14, color="green"),
-            textangle=90
+            textangle=90,
+            showarrow=False
         )
         
         max_dim = max(dim1, dim2)
@@ -458,34 +449,70 @@ def draw_cross_section(section_type, dim1, dim2, dim3, dim4, dim5, dim6):
         # Dimensiones y anotaciones
         margin = max(dim1, dim2) * 0.15
         
+        # Dimensiones exteriores
         fig.add_annotation(
-            x=0, y=-dim2/2-margin*1.3,
+            x=0, y=-dim2/2-dim3*1.85,
             text=f"b = {dim1:.1f} mm",
             bgcolor="white", bordercolor="red", borderwidth=2,
-            font=dict(size=14, color="red")
+            font=dict(size=14, color="red"),
+            showarrow=False
         )
         fig.add_annotation(
-            x=-dim1/2-margin*1.3, y=0,
+            x=-dim1/2-dim4*1.85, y=0,
             text=f"h = {dim2:.1f} mm",
             bgcolor="white", bordercolor="green", borderwidth=2,
             font=dict(size=14, color="green"),
-            textangle=90
+            textangle=90,
+            showarrow=False
         )
         
+        # Espesores con flechas mejoradas apuntando a las paredes correctas
+        # ty (dim3) = espesor en Y (paredes horizontales - superior e inferior)
         if dim3 > 0:
+            # Línea de dimensión para el espesor horizontal (ty)
+            fig.add_shape(
+                type="line",
+                x0=dim1/4, y0=dim2/2,
+                x1=dim1/4, y1=dim2/2-dim3,
+                line=dict(color="orange", width=3)
+            )
             fig.add_annotation(
-                x=-dim1/4, y=dim2/2+margin,
-                text=f"tx = {dim3:.1f} mm",
-                bgcolor="white", bordercolor="orange", borderwidth=2,
+                x=dim1/4, y=dim2/2-dim3/2,  # Centrado en el espesor
+                text=f"ty = {dim3:.1f} mm",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1.5,
+                arrowwidth=3,
+                arrowcolor="orange",
+                ax=dim1/4 + margin*1.2, ay=-dim2/2-dim3/2,  # Posición del texto
+                bgcolor="white", 
+                bordercolor="orange", 
+                borderwidth=2,
                 font=dict(size=12, color="orange")
             )
+            
+        # tx (dim4) = espesor en X (paredes verticales - izquierda y derecha)  
         if dim4 > 0:
+            # Línea de dimensión para el espesor vertical (tx)
+            fig.add_shape(
+                type="line",
+                x0=dim1/2, y0=dim2/4,
+                x1=dim1/2-dim4, y1=dim2/4,
+                line=dict(color="purple", width=3)
+            )
             fig.add_annotation(
-                x=dim1/2+margin, y=dim2/4,
-                text=f"ty = {dim4:.1f} mm",
-                bgcolor="white", bordercolor="purple", borderwidth=2,
-                font=dict(size=12, color="purple"),
-                textangle=90
+                x=dim1/2-dim4/2, y=dim2/4,  # Centrado en el espesor
+                text=f"tx = {dim4:.1f} mm",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1.5,
+                arrowwidth=3,
+                arrowcolor="purple",
+                ax=dim1/2-dim4/2, ay=dim2/4 + margin*1.2,  # Posición del texto
+                bgcolor="white", 
+                bordercolor="purple", 
+                borderwidth=2,
+                font=dict(size=12, color="purple")
             )
             
         max_dim = max(dim1, dim2)
@@ -554,10 +581,11 @@ def draw_cross_section(section_type, dim1, dim2, dim3, dim4, dim5, dim6):
                 line=dict(color="green", width=2)
             )
         fig.add_annotation(
-            x=0, y=-h/2-margin*1.4,
+            x=0, y=-h/2-margin*1.8,
             text=f"b_b = {b_b:.1f} mm",
             bgcolor="white", bordercolor="green", borderwidth=2,
-            font=dict(size=12, color="green")
+            font=dict(size=12, color="green"),
+            showarrow=False
         )
         
         # Línea de cota para ala superior (b_t) - parte superior
@@ -576,35 +604,111 @@ def draw_cross_section(section_type, dim1, dim2, dim3, dim4, dim5, dim6):
                 line=dict(color="purple", width=2)
             )
         fig.add_annotation(
-            x=0, y=h/2+margin*1.4,
+            x=0, y=h/2+margin*1.8,
             text=f"b_t = {b_t:.1f} mm",
             bgcolor="white", bordercolor="purple", borderwidth=2,
-            font=dict(size=12, color="purple")
+            font=dict(size=12, color="purple"),
+            showarrow=False
         )
         
         # Dimensión del espesor del alma (tw) - centro
         if t_w > 0:
             fig.add_shape(
                 type="line",
-                x0=-t_w/2, y0=h*0.25,
-                x1=t_w/2, y1=h*0.25,
+                x0=-t_w/2, y0=h*0.1,
+                x1=t_w/2, y1=h*0.1,
                 line=dict(color="orange", width=2)
             )
             # Marcas de extremo para espesor alma
             for x_pos in [-t_w/2, t_w/2]:
                 fig.add_shape(
                     type="line",
-                    x0=x_pos, y0=h*0.22,
-                    x1=x_pos, y1=h*0.28,
+                    x0=x_pos, y0=h*0.1,
+                    x1=x_pos, y1=h*0.1,
                     line=dict(color="orange", width=2)
                 )
             fig.add_annotation(
-                x=0, y=h*0.35,
+                x=0, y=h*0.15,
                 text=f"tw = {t_w:.1f} mm",
                 bgcolor="white", bordercolor="orange", borderwidth=2,
                 font=dict(size=10, color="orange")
             )
             
+        # Espesor ala inferior (t_b) - líneas verticales y etiqueta en 0.75 de la base
+        if t_b > 0:
+            # Línea de cota para espesor ala inferior (t_b)
+            x_label = b_b * 0.75 / 2
+            fig.add_shape(
+            type="line",
+            x0=-x_label, y0=-h/2,
+            x1=-x_label, y1=-h/2 + t_b,
+            line=dict(color="brown", width=2)
+            )
+            fig.add_shape(
+            type="line",
+            x0=x_label, y0=-h/2,
+            x1=x_label, y1=-h/2 + t_b,
+            line=dict(color="brown", width=2)
+            )
+            # Marcas de extremo para espesor ala inferior
+            for x_pos in [-x_label, x_label]:
+                fig.add_shape(
+                    type="line",
+                    x0=x_pos - t_b*0.2, y0=-h/2,
+                    x1=x_pos + t_b*0.2, y1=-h/2,
+                    line=dict(color="brown", width=2)
+                )
+            fig.add_shape(
+                type="line",
+                x0=x_pos - t_b*0.2, y0=-h/2 + t_b,
+                x1=x_pos + t_b*0.2, y1=-h/2 + t_b,
+                line=dict(color="brown", width=2)
+            )
+            fig.add_annotation(
+            x=0, y=-h/2 + t_b/2,
+            text=f"t_b = {t_b:.1f} mm",
+            bgcolor="white", bordercolor="brown", borderwidth=2,
+            font=dict(size=10, color="brown"),
+            showarrow=False
+            )
+
+        # Espesor ala superior (t_t) - líneas verticales y etiqueta en 0.75 de la base superior
+        if t_t > 0:
+            x_label = b_t * 0.75 / 2
+            fig.add_shape(
+            type="line",
+            x0=-x_label, y0=h/2 - t_t,
+            x1=-x_label, y1=h/2,
+            line=dict(color="darkgreen", width=2)
+            )
+            fig.add_shape(
+            type="line",
+            x0=x_label, y0=h/2 - t_t,
+            x1=x_label, y1=h/2,
+            line=dict(color="darkgreen", width=2)
+            )
+            # Marcas de extremo para espesor ala superior
+            for x_pos in [-x_label, x_label]:
+                fig.add_shape(
+                    type="line",
+                    x0=x_pos - t_t*0.2, y0=h/2 - t_t,
+                    x1=x_pos + t_t*0.2, y1=h/2 - t_t,
+                    line=dict(color="darkgreen", width=2)
+                )
+            fig.add_shape(
+                type="line",
+                x0=x_pos - t_t*0.2, y0=h/2,
+                x1=x_pos + t_t*0.2, y1=h/2,
+                line=dict(color="darkgreen", width=2)
+            )
+            fig.add_annotation(
+            x=0, y=h/2 - t_t/2,
+            text=f"t_t = {t_t:.1f} mm",
+            bgcolor="white", bordercolor="darkgreen", borderwidth=2,
+            font=dict(size=10, color="darkgreen"),
+            showarrow=False
+            )
+
         max_dim = max(h, b_b, b_t)
         axis_range = [-max_dim*0.8, max_dim*0.8]
     
@@ -1052,8 +1156,8 @@ with colA:
     elif section_type == "BOX":
         dim1 = st.number_input("dim1 = ancho b", min_value=0.0, value=60.0, step=0.5)
         dim2 = st.number_input("dim2 = alto h", min_value=0.0, value=80.0, step=0.5)
-        dim3 = st.number_input("dim3 = espesor en ancho t_x", min_value=0.0, value=5.0, step=0.5)
-        dim4 = st.number_input("dim4 = espesor en alto t_y", min_value=0.0, value=5.0, step=0.5)
+        dim3 = st.number_input("dim3 = espesor en alto t_y", min_value=0.0, value=5.0, step=0.5)
+        dim4 = st.number_input("dim4 = espesor en ancho t_x", min_value=0.0, value=5.0, step=0.5)
     elif section_type == "I":
         dim1 = st.number_input("dim1 = alto total h", min_value=0.0, value=120.0, step=0.5)
         dim2 = st.number_input("dim2 = ancho ala inferior b_b", min_value=0.0, value=60.0, step=0.5)

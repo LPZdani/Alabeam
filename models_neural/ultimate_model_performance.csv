@@ -1,0 +1,3 @@
+Model_Type,R²,MAE,RMSE,Architecture,Improvement_R²,Improvement_MAE,Status,Model_File
+LightGBM_Displacement,0.842,11.569,-,Gradient_Boosting,0.0,0.0,Baseline,model_max_displacement_logHGB.joblib
+NeuralNet_Displacement_ULTIMATE,0.8862601249321858,9.062893444321439,24.32480088413384,Multi_Path_Ensemble_NN,0.044260124932185785,2.5061065556785618,ACHIEVED,model_max_displacement_neuralnet_ultimate.keras
