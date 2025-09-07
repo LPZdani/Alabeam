@@ -406,8 +406,8 @@ def draw_cross_section(section_type, dim1, dim2, dim3, dim4, dim5, dim6):
         y_outer = [-dim2/2, -dim2/2, dim2/2, dim2/2, -dim2/2]
         
         # Rectángulo interior (hueco)
-        inner_w = dim1 - 2*dim3
-        inner_h = dim2 - 2*dim4
+        inner_w = dim1 - 2*dim4
+        inner_h = dim2 - 2*dim3
         
         if inner_w > 0 and inner_h > 0:
             x_inner = [-inner_w/2, inner_w/2, inner_w/2, -inner_w/2, -inner_w/2]
